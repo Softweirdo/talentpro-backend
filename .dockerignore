@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env.*
+!.env.example
+node_modules
+npm-debug.log*
+logs/
+coverage/
+dist/
+tests/
+seeds/
+scripts/
+.github/
+k8s/
+*.md
+# Never bake the Firebase service-account JSON into the image
+src/config/studysnap-*.json
