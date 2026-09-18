@@ -10,6 +10,7 @@ COPY package*.json ./
 # Install app dependencies
 RUN npm install -f
 
+RUN npm run build
 # Bundle app source
 COPY . .
 # COPY .env
