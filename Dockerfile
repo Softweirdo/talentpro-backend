@@ -24,6 +24,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --ignore-scripts && npm rebuild argon2
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
+COPY scripts/build-report.mjs ./scripts/build-report.mjs
 # Excludes tests, the seed script and sourcemaps.
 RUN npm run build:prod
 

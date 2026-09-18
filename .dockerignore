@@ -12,7 +12,7 @@ npm-debug.log*
 src/__tests__
 **/*.test.ts
 vitest.config.ts
-scripts
+scripts/e2e.sh
 coverage
 .git
 .gitignore
