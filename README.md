@@ -22,7 +22,21 @@ Generate the secrets with `openssl rand -base64 48`. With `SMS_PROVIDER=mock` (t
 | `npm test` | 38 unit tests (state machine, IST date maths, mobile normalisation, audience tiers, CSV) |
 | `npm run tenure:run` | Run the tenure sweep once, now |
 | `npm run reconcile` | Recompute every denormalised counter and report drift |
+| `npm run build` | Compile to `dist/` (keeps sourcemaps, for local debugging) |
+| `npm run build:prod` | Compile for an image — no tests, seed or sourcemaps |
+| `npm start` | Run the compiled `dist/server.js` |
 | `npm run typecheck` | `tsc --noEmit` |
+
+> **`npm run build` compiles — it does not start anything.** Use `npm run dev`
+> while working, or `npm start` to run a compiled build. The build prints a
+> summary on success, because bare `tsc` says nothing and a silent pass is
+> indistinguishable from a command that did nothing:
+>
+> ```
+>   ✓ Build complete — 63 files (+63 sourcemaps), 0.59 MB
+>     entry:  dist/server.js
+>     run it: npm start
+> ```
 
 `bash scripts/e2e.sh` exercises the whole product against a running server — 53 checks covering OTP login and rate limits, apply, refer (including first-referrer-wins and self-referral), the pipeline, inline organization editing with history archiving, code assignment, the tenure cron and its idempotency, payout with an edited amount, exports, and refresh-token reuse detection.
 
@@ -74,3 +88,38 @@ Base `/api/v1`. Errors are always `{ error: { code, message, details? } }` — b
 | 03:00 | Reconcile every denormalised counter, log any drift |
 
 Set `ENABLE_CRON=false` when running more than one instance, and run the jobs from a single worker instead.
+
+
+## Docker
+
+```bash
+# From the repo root — builds the API and the admin panel together.
+docker compose up --build
+
+#   admin  → http://localhost:8080   (nginx proxies /api to the API)
+#   api    → http://localhost:4000
+```
+
+The API image is multi-stage: dependencies, build, then a runtime layer holding
+only `dist/` and the production dependency tree. It runs as the unprivileged
+`node` user and carries a healthcheck against `/health`.
+
+Two things worth knowing:
+
+**Secrets are never baked in.** `.dockerignore` excludes `.env`, and compose
+injects it at runtime through `env_file`. Rebuild-free secret rotation, and
+nothing sensitive ends up in a layer.
+
+**Debian slim, not Alpine.** `argon2` is a native module that ships prebuilt
+binaries for glibc only. On musl every image build would compile it from source
+with `python3`/`make`/`g++` installed — slower images for no benefit.
+
+To run the API alone:
+
+```bash
+docker build -t talentpro-api ./talentpro-backend
+docker run --rm -p 4000:4000 --env-file talentpro-backend/.env talentpro-api
+```
+
+Scale with care: `ENABLE_CRON` must be `true` on exactly one replica, and the
+rate limiter is in-process, so more than one instance needs it moved to Redis.

@@ -1,7 +1,7 @@
 {
   "name": "talentpro-backend",
   "version": "1.0.0",
-  "description": "TalentPro API — blue-collar hiring platform with referral rewards",
+  "description": "TalentPro API \u2014 blue-collar hiring platform with referral rewards",
   "type": "module",
   "main": "dist/server.js",
   "engines": {
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-report.mjs",
     "start": "node dist/server.js",
     "seed": "tsx src/seed/seed.ts",
     "seed:fresh": "tsx src/seed/seed.ts --fresh",
@@ -17,7 +17,8 @@
     "tenure:run": "tsx src/jobs/tenureCron.ts --once",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:prod": "tsc -p tsconfig.build.json && node scripts/build-report.mjs"
   },
   "dependencies": {
     "argon2": "^0.44.0",
