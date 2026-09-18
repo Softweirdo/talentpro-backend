@@ -31,7 +31,7 @@ RUN npm run build:prod
 FROM base AS runtime
 
 # node:22-slim already provides an unprivileged `node` user (uid 1000).
-ENV PORT=4000 \
+ENV PORT=4048 \
     NODE_OPTIONS=--enable-source-maps
 
 COPY --chown=node:node --from=deps /app/node_modules ./node_modules
@@ -39,13 +39,13 @@ COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node package.json ./
 
 USER node
-EXPOSE 4000
+EXPOSE 4048
 
 # The API refuses to start in production without the indexes that enforce
 # first-referrer-wins and one-reward-per-referral, so a failing container here
 # is a real signal rather than a flake.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4048)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Node is PID 1 here. The server installs SIGTERM/SIGINT handlers and closes
 # the HTTP server and Mongo connection, so no init shim is needed.
