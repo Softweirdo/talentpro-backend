@@ -13,6 +13,9 @@ const schema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   CORS_ORIGINS: z.string().default('').transform(csv),
 
+  // Stamped into the image at build time; 'unknown' when running from source.
+  GIT_COMMIT_SHA: z.string().default('unknown'),
+
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
 
   // Separate secrets per audience: an employee token must be structurally

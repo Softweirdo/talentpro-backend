@@ -66,6 +66,10 @@ export function createApp(): Express {
       status: state === 1 ? 'ok' : 'degraded',
       db: ['disconnected', 'connected', 'connecting', 'disconnecting'][state] ?? 'unknown',
       env: env.NODE_ENV,
+      // `commit` and `uptime` together answer "is my deploy actually live?"
+      // without shell access to the host.
+      commit: env.GIT_COMMIT_SHA,
+      corsOrigins: env.CORS_ORIGINS,
       uptime: Math.round(process.uptime()),
     });
   });

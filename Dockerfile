@@ -39,6 +39,15 @@ COPY --chown=node:node --from=deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node package.json ./
 
+# CapRover passes the deployed commit as a build arg (it currently warns that
+# it is unconsumed). Consuming it here does two jobs. /health can report which
+# build is actually live, and — because this layer differs per commit — a fully
+# cached rebuild can no longer produce a byte-identical image id, which Swarm
+# treats as "nothing changed" and silently declines to roll. Declared last so
+# a new commit still reuses the dependency and build layers above.
+ARG CAPROVER_GIT_COMMIT_SHA=unknown
+ENV GIT_COMMIT_SHA=$CAPROVER_GIT_COMMIT_SHA
+
 USER node
 EXPOSE 4048
 
