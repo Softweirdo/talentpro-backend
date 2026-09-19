@@ -84,12 +84,12 @@ R=$(curl -s -X POST $API/auth/register -H "Authorization: Bearer $RT" -H 'Conten
 [ "$(echo "$R" | j data.employee.language)" = "gu" ] && ok "Gujarati name + language=gu saved: $(echo "$R" | j data.employee.name)" || no "gujarati registration" "$R"
 
 echo "── 5. Admin auth & audience isolation ────────────────────"
-R=$(curl -s -X POST $API/admin/auth/login -H 'Content-Type: application/json' -d '{"email":"jimit@mpowersolutions.in","password":"ChangeMe@123"}')
+R=$(curl -s -X POST $API/admin/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@gmail.com","password":"Admin@123"}')
 ADM=$(echo "$R" | j data.accessToken)
 [ -n "$ADM" ] && ok "admin signed in: $(echo "$R" | j data.admin.name) ($(echo "$R" | j data.admin.role))" || no "admin login" "$R"
 AA="Authorization: Bearer $ADM"
 
-R=$(curl -s -X POST $API/admin/auth/login -H 'Content-Type: application/json' -d '{"email":"jimit@mpowersolutions.in","password":"wrong"}')
+R=$(curl -s -X POST $API/admin/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@gmail.com","password":"wrong"}')
 [ "$(echo "$R" | j error.code)" = "INVALID_CREDENTIALS" ] && ok "bad admin password rejected" || no "bad password" "$R"
 
 R=$(curl -s -o /dev/null -w '%{http_code}' $API/admin/employees -H "$A")

@@ -47,7 +47,7 @@ const schema = z.object({
     .transform((v) => v === 'true'),
 
   SEED_ADMIN_EMAIL: z.string().email().default('admin@talentpro.local'),
-  SEED_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe@123'),
+  SEED_ADMIN_PASSWORD: z.string().min(8).default('Admin@123'),
   SEED_ADMIN_NAME: z.string().default('Super Admin'),
 });
 

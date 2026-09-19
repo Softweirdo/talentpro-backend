@@ -93,11 +93,8 @@ Set `ENABLE_CRON=false` when running more than one instance, and run the jobs fr
 ## Docker
 
 ```bash
-# From the repo root — builds the API and the admin panel together.
-docker compose up --build
-
-#   admin  → http://localhost:8080   (nginx proxies /api to the API)
-#   api    → http://localhost:4000
+# From the repo root.
+docker compose up --build     # api → http://localhost:4048
 ```
 
 The API image is multi-stage: dependencies, build, then a runtime layer holding
@@ -118,7 +115,7 @@ To run the API alone:
 
 ```bash
 docker build -t talentpro-api ./talentpro-backend
-docker run --rm -p 4000:4000 --env-file talentpro-backend/.env talentpro-api
+docker run --rm -p 4048:4048 --env-file talentpro-backend/.env talentpro-api
 ```
 
 Scale with care: `ENABLE_CRON` must be `true` on exactly one replica, and the

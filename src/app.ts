@@ -5,6 +5,7 @@ import compression from 'compression';
 import { pinoHttp } from 'pino-http';
 import mongoose from 'mongoose';
 import { env, isProd } from './config/env.js';
+import { corsOptions } from './config/cors.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { authRouter, adminAuthRouter } from './modules/auth/auth.routes.js';
@@ -33,15 +34,21 @@ export function createApp(): Express {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
-  app.use(helmet());
-  app.use(
-    cors({
-      // An empty allowlist in development means "any origin", so the Expo dev
-      // client and the Vite panel work without configuration.
-      origin: env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : true,
-      credentials: true,
-    }),
-  );
+  // helmet defaults CORP to `same-origin`. That does not affect the panel's
+  // fetch() calls — CORS governs those — but it does block embedding a
+  // response from another site, e.g. an /exports download opened from the
+  // panel. This API is cross-origin by design, so opt out.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // Every response varies by Origin, including the ones CORS rejects, so a
+  // cache in front of the API cannot serve one origin's answer to another.
+  app.use((_req, res, next) => {
+    res.vary('Origin');
+    next();
+  });
+  // Mounted ahead of every router: the preflight is answered here, so a
+  // downstream rate limiter or auth guard can never turn an OPTIONS into a
+  // 401/429, which reaches the browser as an opaque "Network Error".
+  app.use(cors(corsOptions));
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
