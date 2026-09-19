@@ -8,7 +8,7 @@ Node.js · Express 5 · Mongoose · TypeScript. Serves both the employee mobile 
 cp .env.example .env      # MONGODB_URI + four secrets
 npm install
 npm run seed:fresh        # wipes and reseeds with the prototype's demo data
-npm run dev               # http://localhost:4000
+npm run dev               # http://localhost:4048
 ```
 
 Generate the secrets with `openssl rand -base64 48`. With `SMS_PROVIDER=mock` (the default) the OTP is logged *and* returned in the API response outside production, so the whole auth flow works with no gateway.

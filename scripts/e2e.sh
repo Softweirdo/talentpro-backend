@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end smoke test of the TalentPro API.
 set -uo pipefail
-API=http://localhost:4000/api/v1
+API=${API:-http://localhost:4048/api/v1}
 PASS=0; FAIL=0
 ok(){ echo "  ✓ $1"; PASS=$((PASS+1)); }
 no(){ echo "  ✗ $1"; echo "     $2" | head -c 400; echo; FAIL=$((FAIL+1)); }
