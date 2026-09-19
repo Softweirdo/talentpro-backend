@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './config/db.js';
 import { assertCriticalIndexes, syncIndexes } from './config/indexes.js';
-import { env } from './config/env.js';
+import { env, fixedOtpCode } from './config/env.js';
 import { logger } from './config/logger.js';
 import { startScheduler } from './jobs/scheduler.js';
 import './models/index.js';
@@ -18,6 +18,15 @@ async function main(): Promise<void> {
   if (missing.length > 0 && env.NODE_ENV === 'production') {
     logger.fatal({ missing }, 'refusing to start without the indexes that enforce uniqueness');
     process.exit(1);
+  }
+
+  // Loud on every boot: a fixed OTP means anyone holding it can sign in as any
+  // mobile number, so it must never be left set once real users arrive.
+  if (fixedOtpCode) {
+    logger.warn(
+      { code: fixedOtpCode },
+      'OTP_FIXED_CODE is set — every number accepts this code. Unset it before real users.',
+    );
   }
 
   const app = createApp();

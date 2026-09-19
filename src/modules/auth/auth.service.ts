@@ -24,7 +24,7 @@ import { generateOtpCode, generateReferralCode, hashOtp, verifyOtp } from '../..
 import { maskMobile, normalizeMobile } from '../../utils/mobile.js';
 import { DEFAULTS } from '../../utils/constants.js';
 import { badRequest, forbidden, notFound, unauthorized } from '../../utils/errors.js';
-import { exposeOtp } from '../../config/env.js';
+import { exposeOtp, fixedOtpCode } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { transitionReferral, recomputeReferralCount } from '../../services/referralService.js';
 import type { RegisterInput } from './auth.schema.js';
@@ -90,7 +90,9 @@ export async function requestOtp(params: {
     { $set: { consumedAt: new Date(), smsStatus: 'failed' } },
   );
 
-  const code = generateOtpCode(6);
+  // A fixed code (OTP_FIXED_CODE) stands in for the gateway while none is live:
+  // every number gets the same OTP. Unset it and codes go back to random.
+  const code = fixedOtpCode ?? generateOtpCode(6);
   const otp = await Otp.create({
     mobile,
     codeHash: hashOtp(code),
