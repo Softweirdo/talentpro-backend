@@ -50,14 +50,13 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   /**
    * Overrides the random OTP with a fixed code for EVERY number, so the app is
-   * usable while no SMS gateway is live. Unset (empty) means normal random codes.
-   * Anyone who knows this code can sign in as any mobile number — clear it before
-   * this deployment carries real users.
+   * usable while no SMS gateway is live. Empty means normal random codes.
+   * Anyone who knows this code can sign in as any mobile number.
    */
   OTP_FIXED_CODE: z
     .string()
     .regex(/^\d{6}$|^$/, 'OTP_FIXED_CODE must be 6 digits, or empty')
-    .default(''),
+    .default('123456'),
 
   SEED_ADMIN_EMAIL: z.string().email().default('admin@talentpro.local'),
   SEED_ADMIN_PASSWORD: z.string().min(8).default('Admin@123'),
@@ -85,5 +84,15 @@ export const isTest = env.NODE_ENV === 'test';
  */
 export const exposeOtp = env.EXPOSE_OTP_IN_DEV && !isProd;
 
-/** The fixed OTP, or null when codes should be random. */
-export const fixedOtpCode = env.OTP_FIXED_CODE || null;
+/**
+ * The stand-in for the SMS gateway: while no real provider is configured
+ * (`SMS_PROVIDER=mock`), every number's OTP is this fixed code — in production
+ * too, because the deployed API runs with NODE_ENV=production and would
+ * otherwise issue codes that nobody can read.
+ *
+ * Pointing SMS_PROVIDER at msg91 or fast2sms turns this off by itself, so
+ * integrating a real gateway cannot leave the back door standing. Setting
+ * OTP_FIXED_CODE empty disables it too.
+ */
+export const fixedOtpCode =
+  env.SMS_PROVIDER === 'mock' && env.OTP_FIXED_CODE ? env.OTP_FIXED_CODE : null;

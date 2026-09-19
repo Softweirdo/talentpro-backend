@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { pinoHttp } from 'pino-http';
 import mongoose from 'mongoose';
-import { env, isProd } from './config/env.js';
+import { env, fixedOtpCode, isProd } from './config/env.js';
 import { corsOptions } from './config/cors.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -70,6 +70,10 @@ export function createApp(): Express {
       // without shell access to the host.
       commit: env.GIT_COMMIT_SHA,
       corsOrigins: env.CORS_ORIGINS,
+      sms: env.SMS_PROVIDER,
+      // Whether the gateway stand-in is live, so a deploy can be checked
+      // without shell access. The code itself is never exposed here.
+      fixedOtp: fixedOtpCode !== null,
       uptime: Math.round(process.uptime()),
     });
   });
