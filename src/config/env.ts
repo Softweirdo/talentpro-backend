@@ -40,6 +40,10 @@ const schema = z.object({
   // One of these two: a Messaging Service SID (MG…) or a sender number in E.164.
   TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
+  // A Twilio Verify service (VA…). When set with SMS_PROVIDER=twilio, login
+  // OTPs go through Verify — Twilio generates, sends and checks the code — which
+  // works on a trial account with no phone number or Messaging Service.
+  TWILIO_VERIFY_SERVICE_SID: z.string().optional(),
   // Public URL of POST /api/v1/webhooks/twilio/status. When set, Twilio reports
   // delivered/failed there; it must match byte-for-byte what Twilio calls,
   // because the request signature is computed over it.

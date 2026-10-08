@@ -19,7 +19,7 @@ import {
   signEmployeeAccessToken,
   signRegistrationToken,
 } from '../../services/tokens.js';
-import { sendSms, smsTemplates } from '../../services/sms/index.js';
+import { sendSms, smsTemplates, twilioVerify } from '../../services/sms/index.js';
 import { enforce, reset } from '../../middleware/rateLimit.js';
 import { generateOtpCode, generateReferralCode, hashOtp, verifyOtp } from '../../utils/crypto.js';
 import { maskMobile, normalizeMobile } from '../../utils/mobile.js';
@@ -95,6 +95,28 @@ export async function requestOtp(params: {
     { $set: { consumedAt: new Date(), smsStatus: 'failed' } },
   );
 
+  // Twilio Verify generates and sends the code itself, so there is no local
+  // code to hash or echo back. A fixed code (development stand-in) wins.
+  if (!fixedOtpCode && twilioVerify.enabled) {
+    const result = await twilioVerify.start(mobile);
+    if (!result.ok) throw badRequest('OTP_SEND_FAILED', 'Could not send the code. Please try again.');
+    const otp = await Otp.create({
+      mobile,
+      channel: 'twilio_verify',
+      expiresAt: new Date(Date.now() + DEFAULTS.otpTtlSeconds * 1000),
+      requestIp: params.ip ?? null,
+      deviceId: params.deviceId ?? null,
+      smsStatus: 'sent',
+      smsProviderMessageId: result.providerMessageId ?? null,
+    });
+    return {
+      requestId: String(otp._id),
+      expiresIn: DEFAULTS.otpTtlSeconds,
+      resendAfter: DEFAULTS.otpResendCooldownSeconds,
+      maskedMobile: maskMobile(mobile),
+    };
+  }
+
   // A fixed code (OTP_FIXED_CODE) stands in for the gateway while none is live:
   // every number gets the same OTP. Unset it and codes go back to random.
   const code = fixedOtpCode ?? generateOtpCode(6);
@@ -154,7 +176,11 @@ export async function verifyOtpCode(params: {
   otp.attempts += 1;
   await otp.save();
 
-  if (!verifyOtp(params.code, otp.codeHash)) throw invalid();
+  const ok =
+    otp.channel === 'twilio_verify'
+      ? await twilioVerify.check(otp.mobile, params.code)
+      : verifyOtp(params.code, otp.codeHash);
+  if (!ok) throw invalid();
 
   otp.consumedAt = new Date();
   await otp.save();

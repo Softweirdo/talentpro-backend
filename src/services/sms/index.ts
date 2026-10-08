@@ -144,6 +144,60 @@ export function isValidTwilioSignature(
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
+/**
+ * Twilio Verify: Twilio generates the OTP, sends it and checks it, so the code
+ * never passes through this server. Used for login OTPs when
+ * TWILIO_VERIFY_SERVICE_SID is set.
+ */
+export const twilioVerify = {
+  get enabled(): boolean {
+    return (
+      env.SMS_PROVIDER === 'twilio' &&
+      Boolean(env.TWILIO_VERIFY_SERVICE_SID && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN)
+    );
+  },
+
+  async call(path: string, params: Record<string, string>) {
+    const sid = env.TWILIO_ACCOUNT_SID!;
+    const res = await fetch(`https://verify.twilio.com/v2/Services/${env.TWILIO_VERIFY_SERVICE_SID}/${path}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${Buffer.from(`${sid}:${env.TWILIO_AUTH_TOKEN}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(params),
+    });
+    const json = (await res.json()) as { sid?: string; status?: string; code?: number; message?: string };
+    return { res, json };
+  },
+
+  async start(to: string): Promise<SmsResult> {
+    try {
+      const { res, json } = await this.call('Verifications', { To: to, Channel: 'sms' });
+      if (!res.ok || !json.sid) {
+        const error = json.message ? `${json.code ?? res.status}: ${json.message}` : `HTTP ${res.status}`;
+        logger.warn({ to, error }, 'sms: twilio verify failed to send');
+        return { ok: false, error };
+      }
+      return { ok: true, providerMessageId: json.sid };
+    } catch (err) {
+      logger.warn({ to, error: (err as Error).message }, 'sms: twilio verify failed to send');
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+
+  /** True only when Twilio approves the code. A 404 means expired or used up. */
+  async check(to: string, code: string): Promise<boolean> {
+    try {
+      const { res, json } = await this.call('VerificationCheck', { To: to, Code: code });
+      return res.ok && json.status === 'approved';
+    } catch (err) {
+      logger.warn({ to, error: (err as Error).message }, 'sms: twilio verify check failed');
+      return false;
+    }
+  },
+};
+
 const providers: Record<string, SmsProvider> = {
   mock: new MockSmsProvider(),
   fast2sms: new Fast2SmsProvider(),

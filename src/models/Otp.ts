@@ -6,6 +6,8 @@ export interface OtpDoc extends Document<Types.ObjectId> {
   mobile: string;
   /** HMAC-SHA256 under a server pepper — the plaintext code is never persisted. */
   codeHash: string;
+  /** `twilio_verify`: Twilio holds the code and checks it; codeHash is empty. */
+  channel: 'local' | 'twilio_verify';
   purpose: 'login';
   attempts: number;
   maxAttempts: number;
@@ -21,7 +23,8 @@ export interface OtpDoc extends Document<Types.ObjectId> {
 const otpSchema = new Schema<OtpDoc>(
   {
     mobile: { type: String, required: true, trim: true },
-    codeHash: { type: String, required: true, select: false },
+    codeHash: { type: String, default: '', select: false },
+    channel: { type: String, enum: ['local', 'twilio_verify'], default: 'local' },
     purpose: { type: String, enum: ['login'], default: 'login' },
     attempts: { type: Number, default: 0 },
     maxAttempts: { type: Number, default: DEFAULTS.otpMaxAttempts },
