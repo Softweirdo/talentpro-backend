@@ -133,6 +133,11 @@ export async function requestOtp(params: {
     { _id: otp._id },
     { $set: { smsStatus: result.ok ? 'sent' : 'failed', smsProviderMessageId: result.providerMessageId ?? null } },
   );
+  // Only a real gateway can fail; tell the user rather than leaving them on an
+  // OTP screen waiting for a code that is never coming. A fixed code still works.
+  if (!result.ok && !fixedOtpCode) {
+    throw badRequest('OTP_SEND_FAILED', 'Could not send the code. Please try again.');
+  }
 
   return {
     requestId: String(otp._id),
