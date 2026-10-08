@@ -5,7 +5,7 @@ import { DEFAULTS, TENURE_MONTH_OPTIONS } from '../utils/constants.js';
 export interface SettingDoc extends Document<Types.ObjectId> {
   _id: Types.ObjectId;
   key: 'platform';
-  smsProvider: 'fast2sms' | 'msg91' | 'textlocal';
+  smsProvider: 'fast2sms' | 'msg91' | 'textlocal' | 'twilio';
   smsSenderId: string;
   /** Encrypted at rest; the API only ever returns a masked form. */
   smsApiKeyEnc: string | null;
@@ -24,7 +24,7 @@ const settingSchema = new Schema<SettingDoc>(
     key: { type: String, enum: ['platform'], default: 'platform' },
     smsProvider: {
       type: String,
-      enum: ['fast2sms', 'msg91', 'textlocal'],
+      enum: ['fast2sms', 'msg91', 'textlocal', 'twilio'],
       default: 'fast2sms',
     },
     smsSenderId: { type: String, default: DEFAULTS.smsSenderId, maxlength: 11 },

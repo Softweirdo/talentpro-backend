@@ -6,6 +6,7 @@ import {
   Otp,
   Referral,
   getSettings,
+  permissionsForRole,
   recordAudit,
   type EmployeeDoc,
 } from '../../models/index.js';
@@ -26,7 +27,11 @@ import { DEFAULTS } from '../../utils/constants.js';
 import { badRequest, forbidden, notFound, unauthorized } from '../../utils/errors.js';
 import { exposeOtp, fixedOtpCode } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
-import { transitionReferral, recomputeReferralCount } from '../../services/referralService.js';
+import {
+  transitionReferral,
+  recomputeReferralCount,
+  resolveReferralTerms,
+} from '../../services/referralService.js';
 import type { RegisterInput } from './auth.schema.js';
 
 export interface RequestOtpResult {
@@ -102,7 +107,10 @@ export async function requestOtp(params: {
   });
 
   const result = await sendSms(mobile, smsTemplates.otp(code));
-  await Otp.updateOne({ _id: otp._id }, { $set: { smsStatus: result.ok ? 'sent' : 'failed' } });
+  await Otp.updateOne(
+    { _id: otp._id },
+    { $set: { smsStatus: result.ok ? 'sent' : 'failed', smsProviderMessageId: result.providerMessageId ?? null } },
+  );
 
   return {
     requestId: String(otp._id),
@@ -318,6 +326,48 @@ async function bindReferral(employee: EmployeeDoc, typedCode: string | null): Pr
 
   employee.referredByEmployeeId = referrer._id;
   await employee.save();
+
+  // A typed code with no invitation behind it still has to produce a referral
+  // record. The Referrals screen, `totalReferrals` and the reward lifecycle all
+  // read the referrals collection — a pointer on the employee alone is invisible
+  // to every one of them, so the referrer never saw the friend they brought in.
+  //
+  // `jobId: null` is deliberate: nobody was referred to a specific job, and the
+  // apply flow already matches an open referral with a null job to any job.
+  const liveClaim = await Referral.exists({ friendMobile: employee.mobile, claimActive: true });
+  // Someone else's live claim on this number wins — it is the record that
+  // actually promised a reward, and the unique index would refuse a second.
+  if (liveClaim) return;
+
+  try {
+    const terms = await resolveReferralTerms(null);
+    const referral = await Referral.create({
+      referrerId: referrer._id,
+      jobId: null,
+      categoryId: employee.categoryId ?? referrer.categoryId ?? null,
+      friendName: employee.name,
+      friendMobile: employee.mobile,
+      friendEmployeeId: employee._id,
+      status: 'pending',
+      tenureMonths: terms.tenureMonths,
+      rewardAmount: terms.rewardAmount,
+      // No claim window: the friend is already registered, which is what the
+      // window exists to wait for.
+      expiresAt: null,
+    });
+    // Created pending and transitioned, rather than written straight to
+    // `registered`, so the status-event trail starts where every other
+    // referral's does.
+    await transitionReferral(referral, 'registered', { actorType: 'system' });
+    await recomputeReferralCount(referrer._id);
+  } catch (err) {
+    // Signup must not fail over referral bookkeeping — the account is already
+    // saved, and a lost record is recoverable where a failed registration is not.
+    logger.error(
+      { err, employeeId: String(employee._id), referrerId: String(referrer._id) },
+      'referral: could not record a code-based signup',
+    );
+  }
 }
 
 export async function refreshSession(params: {
@@ -434,7 +484,13 @@ export async function adminLogin(params: {
       tokenVersion: admin.tokenVersion,
     }),
     refreshToken: refresh.token,
-    admin: { id: String(admin._id), name: admin.name, email: admin.email, role: admin.role },
+    admin: {
+      id: String(admin._id),
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      permissions: await permissionsForRole(admin.role),
+    },
   };
 }
 

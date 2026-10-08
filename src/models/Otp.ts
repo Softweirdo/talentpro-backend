@@ -13,7 +13,8 @@ export interface OtpDoc extends Document<Types.ObjectId> {
   consumedAt: Date | null;
   requestIp: string | null;
   deviceId: string | null;
-  smsStatus: 'queued' | 'sent' | 'failed';
+  smsStatus: 'queued' | 'sent' | 'delivered' | 'failed';
+  smsProviderMessageId: string | null;
   createdAt: Date;
 }
 
@@ -28,12 +29,14 @@ const otpSchema = new Schema<OtpDoc>(
     consumedAt: { type: Date, default: null },
     requestIp: { type: String, default: null },
     deviceId: { type: String, default: null },
-    smsStatus: { type: String, enum: ['queued', 'sent', 'failed'], default: 'queued' },
+    smsStatus: { type: String, enum: ['queued', 'sent', 'delivered', 'failed'], default: 'queued' },
+    smsProviderMessageId: { type: String, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'otps' },
 );
 
 otpSchema.index({ mobile: 1, createdAt: -1 });
+otpSchema.index({ smsProviderMessageId: 1 }, { sparse: true });
 // Expired OTPs are swept by Mongo itself; the grace period keeps a short audit
 // trail for rate limiting after expiry.
 otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 3600 });

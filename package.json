@@ -1,7 +1,7 @@
 {
   "name": "talentpro-backend",
   "version": "1.0.0",
-  "description": "TalentPro API \u2014 blue-collar hiring platform with referral rewards",
+  "description": "TalentPro API — blue-collar hiring platform with referral rewards",
   "type": "module",
   "main": "dist/server.js",
   "engines": {
@@ -15,6 +15,10 @@
     "seed:fresh": "tsx src/seed/seed.ts --fresh",
     "reconcile": "tsx src/jobs/reconcileCounters.ts --once",
     "tenure:run": "tsx src/jobs/tenureCron.ts --once",
+    "backfill:referrals": "tsx src/jobs/backfillCodeReferrals.ts --once",
+    "backfill:referrals:dry": "tsx src/jobs/backfillCodeReferrals.ts --dry-run",
+    "translate:jobs": "tsx src/jobs/translateJobs.ts",
+    "sms:test": "tsx src/jobs/smsTest.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

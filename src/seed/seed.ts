@@ -19,6 +19,7 @@ import {
   Setting,
   slugify,
   AuditLog,
+  ensureSystemRoles,
 } from '../models/index.js';
 import { ensureSeedAdminExists } from '../modules/auth/auth.service.js';
 import { generateReferralCode } from '../utils/crypto.js';
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
 
   // ── Settings & admin ─────────────────────────────────────────────────────
   await Setting.findOneAndUpdate({ key: 'platform' }, { $setOnInsert: { key: 'platform' } }, { upsert: true });
+  await ensureSystemRoles();
   await ensureSeedAdminExists({
     email: env.SEED_ADMIN_EMAIL,
     password: env.SEED_ADMIN_PASSWORD,

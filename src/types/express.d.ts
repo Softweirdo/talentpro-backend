@@ -1,4 +1,4 @@
-import type { AdminRole } from '../utils/constants.js';
+import type { AdminRole, Permission } from '../utils/constants.js';
 
 declare global {
   namespace Express {
@@ -14,6 +14,8 @@ declare global {
         id: string;
         email: string;
         role: AdminRole;
+        /** Resolved from the role at request time. */
+        permissions: Permission[];
         tokenVersion: number;
       };
       /** Set by `requireRegistrationToken` — scoped to signup completion only. */

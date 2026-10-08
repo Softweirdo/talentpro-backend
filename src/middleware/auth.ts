@@ -1,12 +1,12 @@
 import type { RequestHandler } from 'express';
-import { Admin, Employee, hasPermission } from '../models/index.js';
+import { Admin, Employee, permissionsForRole } from '../models/index.js';
 import {
   verifyAdminAccessToken,
   verifyEmployeeAccessToken,
   verifyRegistrationToken,
 } from '../services/tokens.js';
 import { forbidden, unauthorized } from '../utils/errors.js';
-import type { AdminRole } from '../utils/constants.js';
+import type { Permission } from '../utils/constants.js';
 
 function bearer(header: string | undefined): string {
   if (!header?.startsWith('Bearer ')) {
@@ -57,10 +57,13 @@ export const requireAdmin: RequestHandler = async (req, _res, next) => {
       throw unauthorized('TOKEN_STALE', 'Please sign in again');
     }
 
+    // Role and permissions come from the database, not the token, so a role
+    // change or a permission edit applies on the admin's very next request.
     req.admin = {
       id: String(admin._id),
       email: admin.email,
       role: admin.role,
+      permissions: await permissionsForRole(admin.role),
       tokenVersion: admin.tokenVersion,
     };
     next();
@@ -71,11 +74,11 @@ export const requireAdmin: RequestHandler = async (req, _res, next) => {
 
 /** Gates an admin route on a specific permission. Use after `requireAdmin`. */
 export const requirePermission =
-  (permission: string): RequestHandler =>
+  (permission: Permission): RequestHandler =>
   (req, _res, next) => {
-    const role = req.admin?.role as AdminRole | undefined;
+    const role = req.admin?.role;
     if (!role) return next(unauthorized());
-    if (!hasPermission(role, permission)) {
+    if (!req.admin!.permissions.includes(permission)) {
       return next(
         forbidden('INSUFFICIENT_ROLE', `Your role (${role}) cannot perform this action`),
       );

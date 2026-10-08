@@ -14,7 +14,15 @@ export {
   type ReferralStatusEventDoc,
 } from './Referral.js';
 export { Reward, type RewardDoc } from './Reward.js';
-export { Admin, type AdminDoc, ROLE_PERMISSIONS, hasPermission } from './Admin.js';
+export { Admin, type AdminDoc } from './Admin.js';
+export {
+  Role,
+  type RoleDoc,
+  effectivePermissions,
+  permissionsForRole,
+  invalidateRoleCache,
+  ensureSystemRoles,
+} from './Role.js';
 export { Otp, type OtpDoc } from './Otp.js';
 export { RefreshToken, type RefreshTokenDoc } from './RefreshToken.js';
 export {

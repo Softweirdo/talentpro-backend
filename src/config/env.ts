@@ -31,13 +31,28 @@ const schema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   ADMIN_REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
-  SMS_PROVIDER: z.enum(['mock', 'fast2sms', 'msg91']).default('mock'),
+  SMS_PROVIDER: z.enum(['mock', 'fast2sms', 'msg91', 'twilio']).default('mock'),
   FAST2SMS_API_KEY: z.string().optional(),
   MSG91_AUTH_KEY: z.string().optional(),
   MSG91_TEMPLATE_ID: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  // One of these two: a Messaging Service SID (MG…) or a sender number in E.164.
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  TWILIO_FROM: z.string().optional(),
+  // Public URL of POST /api/v1/webhooks/twilio/status. When set, Twilio reports
+  // delivered/failed there; it must match byte-for-byte what Twilio calls,
+  // because the request signature is computed over it.
+  TWILIO_STATUS_CALLBACK_URL: z.string().url().optional(),
 
   PUSH_PROVIDER: z.enum(['mock', 'fcm']).default('mock'),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
+
+  // Machine-translates English job postings into Gujarati for the app.
+  // `google` uses the official Cloud Translation API when a key is set, and
+  // Google's keyless public endpoint otherwise. `off` disables it.
+  TRANSLATE_PROVIDER: z.enum(['google', 'off']).default('google'),
+  GOOGLE_TRANSLATE_API_KEY: z.string().optional(),
 
   TIMEZONE: z.string().default('Asia/Kolkata'),
   ENABLE_CRON: z
@@ -50,13 +65,13 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   /**
    * Overrides the random OTP with a fixed code for EVERY number, so the app is
-   * usable while no SMS gateway is live. Empty means normal random codes.
-   * Anyone who knows this code can sign in as any mobile number.
+   * usable while no SMS gateway is live. Empty (the default) means normal random
+   * codes. Anyone who knows this code can sign in as any mobile number.
    */
   OTP_FIXED_CODE: z
     .string()
     .regex(/^\d{6}$|^$/, 'OTP_FIXED_CODE must be 6 digits, or empty')
-    .default('123456'),
+    .default(''),
 
   SEED_ADMIN_EMAIL: z.string().email().default('admin@talentpro.local'),
   SEED_ADMIN_PASSWORD: z.string().min(8).default('Admin@123'),
@@ -90,7 +105,7 @@ export const exposeOtp = env.EXPOSE_OTP_IN_DEV && !isProd;
  * too, because the deployed API runs with NODE_ENV=production and would
  * otherwise issue codes that nobody can read.
  *
- * Pointing SMS_PROVIDER at msg91 or fast2sms turns this off by itself, so
+ * Pointing SMS_PROVIDER at msg91, fast2sms or twilio turns this off by itself, so
  * integrating a real gateway cannot leave the back door standing. Setting
  * OTP_FIXED_CODE empty disables it too.
  */

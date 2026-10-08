@@ -37,7 +37,7 @@ export interface ReferralDoc extends Document<Types.ObjectId> {
 
   rewardId: Types.ObjectId | null;
 
-  smsStatus: 'queued' | 'sent' | 'failed';
+  smsStatus: 'queued' | 'sent' | 'delivered' | 'failed';
   smsProviderMessageId: string | null;
 
   /** Claim window — an unregistered referral lapses rather than paying out years later. */
@@ -82,8 +82,8 @@ const referralSchema = new Schema<ReferralDoc>(
 
     rewardId: { type: Schema.Types.ObjectId, ref: 'Reward', default: null },
 
-    smsStatus: { type: String, enum: ['queued', 'sent', 'failed'], default: 'queued' },
-    smsProviderMessageId: { type: String, default: null },
+    smsStatus: { type: String, enum: ['queued', 'sent', 'delivered', 'failed'], default: 'queued' },
+    smsProviderMessageId: { type: String, default: null, index: { sparse: true } },
 
     expiresAt: { type: Date, default: null },
     cancelledReason: { type: String, default: null, maxlength: 500 },

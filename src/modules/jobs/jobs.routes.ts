@@ -31,6 +31,8 @@ import {
   attachCategoryNames,
   buildJobFilter,
   publicJob,
+  translateJob,
+  translateStaleInBackground,
 } from './jobs.service.js';
 
 const listQuerySchema = cursorQuerySchema.extend({
@@ -100,6 +102,7 @@ jobsRouter.get(
 
     const rows = await Job.find(filter).sort(sort).limit(q.limit + 1).lean();
     const page = toCursorPage(rows, q.limit);
+    translateStaleInBackground(page.data);
 
     const [categoryNames, applied] = await Promise.all([
       attachCategoryNames(page.data),
@@ -146,6 +149,7 @@ jobsRouter.get(
     }
 
     const page = toCursorPage(rows, q.limit);
+    translateStaleInBackground(page.data);
     const [categoryNames, applied] = await Promise.all([
       attachCategoryNames(page.data),
       appliedJobIds(req.employee!.id, page.data.map((j) => j._id)),
@@ -168,6 +172,7 @@ jobsRouter.get(
   asyncHandler(async (req, res) => {
     const job = await Job.findOne({ _id: req.params.id, deletedAt: null }).lean();
     if (!job || job.status === 'draft') throw notFound('JOB_NOT_FOUND', 'This job is no longer available');
+    translateStaleInBackground([job]);
 
     const [categoryNames, applied] = await Promise.all([
       attachCategoryNames([job]),
@@ -321,6 +326,7 @@ adminJobsRouter.post(
       postedAt: status === 'active' ? new Date() : null,
       createdByAdminId: new Types.ObjectId(req.admin!.id),
     });
+    void translateJob(job);
 
     if (status === 'active') {
       const recipients = await broadcastJob(job);
@@ -375,6 +381,7 @@ adminJobsRouter.patch(
 
     if (req.body.status === 'active' && !job.postedAt) job.postedAt = new Date();
     await job.save();
+    void translateJob(job);
 
     await recordAudit({
       actorType: 'admin',

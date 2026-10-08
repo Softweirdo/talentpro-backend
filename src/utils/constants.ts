@@ -54,8 +54,61 @@ export type RewardStatus = (typeof REWARD_STATUSES)[number];
 export const EMPLOYMENT_SOURCES = ['signup', 'admin', 'hire_event'] as const;
 export type EmploymentSource = (typeof EMPLOYMENT_SOURCES)[number];
 
-export const ADMIN_ROLES = ['super_admin', 'recruiter', 'viewer'] as const;
-export type AdminRole = (typeof ADMIN_ROLES)[number];
+/**
+ * Every permission a route can check. Roles are stored in the database and
+ * pick from this list; adding a permission means adding it here *and* gating
+ * a route on it. Viewing is not a permission — every active admin can read.
+ */
+export const PERMISSIONS = [
+  'jobs:write',
+  'applications:write',
+  'employees:write',
+  'referrals:write',
+  'rewards:approve',
+  'settings:write',
+  'exports:read',
+  'admins:write',
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
+
+/** Grouped and labelled for the admin Roles page. */
+export const PERMISSION_CATALOG: { group: string; key: Permission; label: string; description: string }[] = [
+  { group: 'Recruit', key: 'jobs:write', label: 'Manage jobs & categories', description: 'Create, edit, publish and close jobs; add or archive categories' },
+  { group: 'Recruit', key: 'applications:write', label: 'Move applications', description: 'Shortlist, schedule interviews, hire and reject' },
+  { group: 'Recruit', key: 'referrals:write', label: 'Manage referrals', description: 'Correct, cancel or override referral status' },
+  { group: 'Money', key: 'rewards:approve', label: 'Approve & pay rewards', description: 'Approve, hold, void and mark rewards paid' },
+  { group: 'Manage', key: 'employees:write', label: 'Edit employees', description: 'Profiles, employee codes, employment history, blocking' },
+  { group: 'Manage', key: 'exports:read', label: 'Export data', description: 'Download CSV exports of every collection' },
+  { group: 'Setup', key: 'settings:write', label: 'Change platform settings', description: 'SMS and push credentials, reward and tenure defaults' },
+  { group: 'Setup', key: 'admins:write', label: 'Manage admins & roles', description: 'Invite admins, assign roles, edit role permissions' },
+];
+
+/** An admin's role is the key of a document in `roles`. */
+export type AdminRole = string;
+
+export const SUPER_ADMIN_ROLE = 'super_admin';
+
+/** Seeded at startup if missing. Reward approval and settings stay super-admin only by default — they move money and credentials. */
+export const SYSTEM_ROLES: { key: string; name: string; description: string; permissions: readonly Permission[] }[] = [
+  {
+    key: SUPER_ADMIN_ROLE,
+    name: 'Super Admin',
+    description: 'Full access, including payouts, settings and admin management. Cannot be edited.',
+    permissions: PERMISSIONS,
+  },
+  {
+    key: 'recruiter',
+    name: 'Recruiter',
+    description: 'Runs the hiring pipeline day to day.',
+    permissions: ['jobs:write', 'applications:write', 'employees:write', 'referrals:write'],
+  },
+  {
+    key: 'viewer',
+    name: 'Viewer',
+    description: 'Read-only access to every page.',
+    permissions: [],
+  },
+];
 
 export const ACTOR_TYPES = ['admin', 'employee', 'system'] as const;
 export type ActorType = (typeof ACTOR_TYPES)[number];

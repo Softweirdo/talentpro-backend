@@ -11,6 +11,15 @@ import {
   type NotifyCase,
 } from '../utils/constants.js';
 
+export interface JobTranslation {
+  title: string;
+  location: string;
+  description: string | null;
+  requirements: string[];
+  sourceHash: string;
+  translatedAt: Date;
+}
+
 export interface JobDoc extends Document<Types.ObjectId> {
   _id: Types.ObjectId;
   title: string;
@@ -23,6 +32,13 @@ export interface JobDoc extends Document<Types.ObjectId> {
   salaryMax: number;
   description: string | null;
   requirements: string[];
+
+  /**
+   * Machine translation for the app's Gujarati mode. `sourceHash` fingerprints
+   * the English it was made from, so an edit leaves it visibly stale rather
+   * than silently showing the old text.
+   */
+  gu: JobTranslation | null;
 
   /** Copied onto each referral at creation; editing these never alters money already promised. */
   referralReward: number;
@@ -56,6 +72,20 @@ const jobSchema = new Schema<JobDoc>(
     salaryMax: { type: Number, required: true, min: 0 },
     description: { type: String, default: null, maxlength: 5000 },
     requirements: { type: [String], default: [] },
+    gu: {
+      type: new Schema<JobTranslation>(
+        {
+          title: String,
+          location: String,
+          description: { type: String, default: null },
+          requirements: { type: [String], default: [] },
+          sourceHash: String,
+          translatedAt: Date,
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
 
     referralReward: { type: Number, required: true, min: 0 },
     tenureMonths: { type: Number, enum: TENURE_MONTH_OPTIONS, required: true },

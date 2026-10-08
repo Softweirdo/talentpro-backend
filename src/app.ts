@@ -25,7 +25,9 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { adminAnalyticsRouter } from './modules/analytics/analytics.routes.js';
 import { adminExportsRouter } from './modules/exports/exports.routes.js';
 import { adminSettingsRouter } from './modules/settings/settings.routes.js';
-import { getSettings } from './models/index.js';
+import { adminRolesRouter, adminUsersRouter } from './modules/roles/roles.routes.js';
+import { twilioWebhookRouter } from './modules/webhooks/twilio.routes.js';
+import { Admin, getSettings } from './models/index.js';
 import { requireAdmin } from './middleware/auth.js';
 
 export function createApp(): Express {
@@ -83,6 +85,8 @@ export function createApp(): Express {
   // ── Public ───────────────────────────────────────────────────────────────
   api.use('/auth', authRouter);
   api.use('/categories', publicCategoriesRouter);
+  // Authenticated by the provider's request signature, not a token.
+  api.use('/webhooks/twilio', twilioWebhookRouter);
 
   /** App bootstrap: the defaults the mobile client needs before signing in. */
   api.get('/config', async (_req, res, next) => {
@@ -121,9 +125,17 @@ export function createApp(): Express {
   admin.use('/categories', adminCategoriesRouter);
   admin.use('/exports', adminExportsRouter);
   admin.use('/settings', adminSettingsRouter);
+  admin.use('/roles', adminRolesRouter);
+  admin.use('/admins', adminUsersRouter);
 
-  admin.get('/me', requireAdmin, (req, res) => {
-    res.json({ data: req.admin });
+  admin.get('/me', requireAdmin, async (req, res, next) => {
+    try {
+      const { tokenVersion: _ver, ...me } = req.admin!;
+      const doc = await Admin.findById(me.id).select('name').lean();
+      res.json({ data: { ...me, name: doc?.name ?? null } });
+    } catch (err) {
+      next(err);
+    }
   });
 
   api.use('/admin', admin);

@@ -104,6 +104,8 @@ export async function issueRefreshToken(params: {
   familyId?: Types.ObjectId;
   parentId?: Types.ObjectId | null;
   ttlDays?: number;
+  /** An exact expiry, overriding `ttlDays` — rotation carries the family's forward. */
+  expiresAt?: Date;
   deviceId?: string | null;
   userAgent?: string | null;
   ip?: string | null;
@@ -113,7 +115,7 @@ export async function issueRefreshToken(params: {
     (params.subjectType === 'admin' ? env.ADMIN_REFRESH_TOKEN_TTL_DAYS : env.REFRESH_TOKEN_TTL_DAYS);
 
   const token = generateOpaqueToken();
-  const expiresAt = new Date(Date.now() + ttlDays * 86_400_000);
+  const expiresAt = params.expiresAt ?? new Date(Date.now() + ttlDays * 86_400_000);
   const familyId = params.familyId ?? new Types.ObjectId();
 
   await RefreshToken.create({
@@ -175,6 +177,9 @@ export async function rotateRefreshToken(
     subjectId: record.subjectId,
     familyId: record.familyId,
     parentId: record._id,
+    // The session lasts a fixed REFRESH_TOKEN_TTL_DAYS from sign-in; rotating
+    // must not slide it forward, or an active user would never re-authenticate.
+    expiresAt: record.expiresAt,
     deviceId: meta.deviceId ?? record.deviceId,
     userAgent: meta.userAgent ?? record.userAgent,
     ip: meta.ip ?? record.ip,

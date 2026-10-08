@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 
@@ -84,10 +85,70 @@ class Msg91Provider implements SmsProvider {
   }
 }
 
+class TwilioProvider implements SmsProvider {
+  readonly name = 'twilio';
+
+  async send(to: string, message: string): Promise<SmsResult> {
+    const sid = env.TWILIO_ACCOUNT_SID;
+    const token = env.TWILIO_AUTH_TOKEN;
+    if (!sid || !token) return { ok: false, error: 'TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not configured' };
+
+    // A Messaging Service picks the sender itself (and carries the India DLT
+    // registration); a bare From number is the fallback.
+    const body = new URLSearchParams({ To: to, Body: message });
+    if (env.TWILIO_MESSAGING_SERVICE_SID) body.set('MessagingServiceSid', env.TWILIO_MESSAGING_SERVICE_SID);
+    else if (env.TWILIO_FROM) body.set('From', env.TWILIO_FROM);
+    else return { ok: false, error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM not configured' };
+    if (env.TWILIO_STATUS_CALLBACK_URL) body.set('StatusCallback', env.TWILIO_STATUS_CALLBACK_URL);
+
+    try {
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      });
+      const json = (await res.json()) as { sid?: string; code?: number; message?: string };
+      if (!res.ok || !json.sid) {
+        return { ok: false, error: json.message ? `${json.code ?? res.status}: ${json.message}` : `HTTP ${res.status}` };
+      }
+      return { ok: true, providerMessageId: json.sid };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+}
+
+/**
+ * Twilio's X-Twilio-Signature: HMAC-SHA1 under the auth token, over the full
+ * callback URL followed by every POST param as key+value, sorted by key.
+ */
+export function twilioSignature(authToken: string, url: string, params: Record<string, string>): string {
+  const payload = Object.keys(params)
+    .sort()
+    .reduce((acc, key) => acc + key + params[key], url);
+  return crypto.createHmac('sha1', authToken).update(payload).digest('base64');
+}
+
+export function isValidTwilioSignature(
+  authToken: string,
+  url: string,
+  params: Record<string, string>,
+  signature: string | undefined,
+): boolean {
+  if (!signature) return false;
+  const expected = Buffer.from(twilioSignature(authToken, url, params));
+  const actual = Buffer.from(signature);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
 const providers: Record<string, SmsProvider> = {
   mock: new MockSmsProvider(),
   fast2sms: new Fast2SmsProvider(),
   msg91: new Msg91Provider(),
+  twilio: new TwilioProvider(),
 };
 
 export const smsProvider: SmsProvider = providers[env.SMS_PROVIDER] ?? providers.mock!;

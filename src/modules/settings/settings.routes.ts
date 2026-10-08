@@ -48,7 +48,7 @@ adminSettingsRouter.patch(
   requirePermission('settings:write'),
   validate({
     body: z.object({
-      smsProvider: z.enum(['fast2sms', 'msg91', 'textlocal']).optional(),
+      smsProvider: z.enum(['fast2sms', 'msg91', 'textlocal', 'twilio']).optional(),
       smsSenderId: z.string().min(3).max(11).optional(),
       smsApiKey: z.string().min(8).max(500).optional(),
       fcmServerKey: z.string().min(8).max(5000).optional(),

@@ -13,11 +13,20 @@ npm run dev               # http://localhost:4048
 
 Generate the secrets with `openssl rand -base64 48`. With `SMS_PROVIDER=mock` (the default) the OTP is logged *and* returned in the API response outside production, so the whole auth flow works with no gateway.
 
+### Twilio SMS
+
+1. In `.env` set `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_MESSAGING_SERVICE_SID` (preferred) or `TWILIO_FROM`.
+2. Check the credentials: `npm run sms:test -- 9876543210`. A trial account can only send to numbers verified in the Twilio console.
+3. Optional, for delivery reports: set `TWILIO_STATUS_CALLBACK_URL` to the API's public URL + `/api/v1/webhooks/twilio/status`. Twilio then marks each OTP and referral SMS `delivered` or `failed`; requests without a valid `X-Twilio-Signature` are rejected with 403.
+
+Indian recipients need DLT registration (entity, sender ID, and every template in `src/services/sms/index.ts`, word for word) attached to the Messaging Service, or carriers drop the messages.
+
 ## Scripts
 
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Watch mode |
+| `npm run sms:test -- <mobile> [--all]` | Send the OTP (or, with `--all`, every template) through the configured `SMS_PROVIDER` |
 | `npm run seed` / `seed:fresh` | Seed, or wipe and seed |
 | `npm test` | 38 unit tests (state machine, IST date maths, mobile normalisation, audience tiers, CSV) |
 | `npm run tenure:run` | Run the tenure sweep once, now |
@@ -50,7 +59,7 @@ src/
   modules/    auth employees jobs applications referrals rewards
               categories analytics exports settings notifications
   services/   tokens, employment, referralService, referralStateMachine,
-              notify, sms/ (mock|fast2sms|msg91), push/ (mock|fcm)
+              notify, sms/ (mock|fast2sms|msg91|twilio), push/ (mock|fcm)
   jobs/       tenureCron, reconcileCounters, scheduler
   middleware/ auth, rateLimit, validate, error
   utils/      dates (IST), mobile (E.164), crypto, csv, paginate, constants

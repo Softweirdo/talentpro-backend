@@ -4,7 +4,7 @@ import { assertCriticalIndexes, syncIndexes } from './config/indexes.js';
 import { env, fixedOtpCode } from './config/env.js';
 import { logger } from './config/logger.js';
 import { startScheduler } from './jobs/scheduler.js';
-import './models/index.js';
+import { ensureSystemRoles } from './models/index.js';
 
 async function main(): Promise<void> {
   await connectDb();
@@ -19,6 +19,10 @@ async function main(): Promise<void> {
     logger.fatal({ missing }, 'refusing to start without the indexes that enforce uniqueness');
     process.exit(1);
   }
+
+  // Every admin's role points at a document in `roles`; without the system
+  // roles nobody, including the bootstrap super admin, could do anything.
+  await ensureSystemRoles();
 
   // Loud on every boot: a fixed OTP means anyone holding it can sign in as any
   // mobile number, so it must never be left set once real users arrive.

@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
 import { Types } from 'mongoose';
 import { Application, Category, Job, type JobDoc } from '../../models/index.js';
 import { fromNow, formatCivilDate } from '../../utils/dates.js';
 import { NOTIFY_CASE_LABELS, type NotifyCase } from '../../utils/constants.js';
+import { translateToGujarati } from '../../services/translate/index.js';
+import { logger } from '../../config/logger.js';
 
 export interface JobListFilters {
   q?: string;
@@ -50,6 +53,7 @@ export function publicJob(job: any, extra: { hasApplied?: boolean; categoryName?
     salaryMax: job.salaryMax,
     description: job.description,
     requirements: job.requirements ?? [],
+    gu: currentTranslation(job),
     referralReward: job.referralReward,
     tenureMonths: job.tenureMonths,
     status: job.status,
@@ -102,4 +106,99 @@ export async function appliedJobIds(
     .select('jobId')
     .lean();
   return new Set(applications.map((a) => String(a.jobId)));
+}
+
+// ─── Gujarati translation ──────────────────────────────────────────────────
+
+type TranslatableJob = {
+  _id: Types.ObjectId;
+  title: string;
+  location: string;
+  description?: string | null;
+  requirements?: string[];
+  gu?: { title: string; location: string; description: string | null; requirements: string[]; sourceHash: string } | null;
+};
+
+/** Fingerprint of the English a translation is made from. */
+function sourceHash(job: TranslatableJob): string {
+  return createHash('sha1')
+    .update(JSON.stringify([job.title, job.location, job.description ?? null, job.requirements ?? []]))
+    .digest('hex');
+}
+
+/** The stored translation, or null if missing or made from older English. */
+function currentTranslation(job: TranslatableJob) {
+  if (!job.gu || job.gu.sourceHash !== sourceHash(job)) return null;
+  return {
+    title: job.gu.title,
+    location: job.gu.location,
+    description: job.gu.description,
+    requirements: job.gu.requirements,
+  };
+}
+
+const inFlight = new Set<string>();
+
+/**
+ * Translates the job's English text to Gujarati and stores it. A no-op when
+ * the stored translation is current. Never throws — a failed translation only
+ * means the app keeps showing English.
+ */
+export async function translateJob(job: TranslatableJob): Promise<void> {
+  const id = String(job._id);
+  const hash = sourceHash(job);
+  if (job.gu?.sourceHash === hash || inFlight.has(id)) return;
+  inFlight.add(id);
+
+  try {
+    const requirements = job.requirements ?? [];
+    // Requirements go as one newline-joined block to keep the request count
+    // down; if the lines do not come back one-for-one they are retried singly.
+    const out = await translateToGujarati([
+      job.title,
+      job.location,
+      job.description ?? '',
+      requirements.join('\n'),
+    ]);
+    if (!out) return;
+
+    let guRequirements = requirements.length ? out[3]!.split('\n').map((r) => r.trim()) : [];
+    if (guRequirements.length !== requirements.length) {
+      const single = await translateToGujarati(requirements);
+      if (!single) return;
+      guRequirements = single;
+    }
+
+    // Guarded on the source hash: if an admin edited the job meanwhile, this
+    // stale result is dropped and the newer save's translation wins.
+    const current = await Job.findById(job._id).select('title location description requirements').lean();
+    if (!current || sourceHash({ ...current, _id: job._id }) !== hash) return;
+
+    await Job.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          gu: {
+            title: out[0],
+            location: out[1],
+            description: job.description ? out[2] : null,
+            requirements: guRequirements,
+            sourceHash: hash,
+            translatedAt: new Date(),
+          },
+        },
+      },
+    );
+  } catch (err) {
+    logger.warn({ err, jobId: id }, 'Job translation failed');
+  } finally {
+    inFlight.delete(id);
+  }
+}
+
+/** Kicks off translation for any of these jobs lacking a current one, without waiting. */
+export function translateStaleInBackground(jobs: TranslatableJob[]): void {
+  for (const job of jobs) {
+    if (!currentTranslation(job)) void translateJob(job);
+  }
 }
