@@ -5,6 +5,7 @@ import compression from 'compression';
 import { pinoHttp } from 'pino-http';
 import mongoose from 'mongoose';
 import { env, fixedOtpCode, isProd } from './config/env.js';
+import { twilioVerify } from './services/sms/index.js';
 import { corsOptions } from './config/cors.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -76,6 +77,14 @@ export function createApp(): Express {
       // Whether the gateway stand-in is live, so a deploy can be checked
       // without shell access. The code itself is never exposed here.
       fixedOtp: fixedOtpCode !== null,
+      // How login OTPs go out, and which Twilio settings this process can see —
+      // presence only, never the values — so a misconfigured deploy is obvious.
+      otp: {
+        via: fixedOtpCode !== null ? 'fixed' : twilioVerify.enabled ? 'twilio_verify' : 'sms',
+        twilioAccountSid: Boolean(env.TWILIO_ACCOUNT_SID),
+        twilioAuthToken: Boolean(env.TWILIO_AUTH_TOKEN),
+        twilioVerifyServiceSid: Boolean(env.TWILIO_VERIFY_SERVICE_SID),
+      },
       uptime: Math.round(process.uptime()),
     });
   });
